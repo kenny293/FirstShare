@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+/*
+ * Apple Fitness-inspired dark palette: near-black background, dark grey cards,
+ * and the three neon "ring" colours (Move pink, Exercise lime, Stand cyan).
+ * Gains/losses are deliberately NOT colour-coded red/green; warnings use orange.
+ * Token names are semantic roles, kept stable so components don't change.
+ */
+@theme {
+  --color-cream: #000000;          /* page background */
+  --color-paper: #1c1c1e;          /* cards */
+  --color-ink: #ffffff;            /* primary text */
+  --color-ink-soft: #aeaeb2;       /* secondary text */
+  --color-ink-faint: #8e8e93;      /* tertiary text */
+  --color-line: #38383a;           /* separators, tracks */
+  --color-brand: #fa114f;          /* Move ring */
+  --color-brand-dark: #a30a34;
+  --color-brand-soft: #fa114f2e;
+  --color-sun: #a6ff00;            /* Exercise ring */
+  --color-sun-soft: #a6ff0024;
+  --color-sky: #00d8fe;            /* Stand ring */
+  --color-sky-soft: #00d8fe24;
+  --color-coral: #ff9f0a;          /* warnings / negative numbers (orange, not red) */
+  --color-coral-soft: #ff9f0a29;
+  --color-plum: #bf5af2;
+  --font-sans: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --animate-pop: pop 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+  --animate-rise: rise 0.4s ease-out;
+  --animate-sheet: sheet 0.3s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+@keyframes pop {
+  from { transform: scale(0.85); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes rise {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes sheet {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+html {
+  color-scheme: dark;
+}
+body {
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+/* Shared building blocks */
+@utility card {
+  @apply rounded-3xl bg-paper p-5;
+}
+@utility btn {
+  @apply inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl px-6 text-lg font-extrabold transition active:translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40;
+}
+@utility btn-primary {
+  @apply btn bg-brand text-white shadow-[0_4px_0_0_var(--color-brand-dark)] active:shadow-[0_1px_0_0_var(--color-brand-dark)];
+}
+@utility btn-secondary {
+  @apply btn bg-paper text-ink ring-1 ring-line;
+}
+@utility chip {
+  @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold;
+}
