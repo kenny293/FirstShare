@@ -12,17 +12,6 @@ export function SignInCard({ title = "Sign in to start", subtitle }: { title?: s
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!configured) {
-    return (
-      <section className="card">
-        <h2 className="text-xl font-black">Sign-in isn&apos;t set up yet</h2>
-        <p className="mt-2 text-sm text-ink-soft">
-          Add your Firebase web config (NEXT_PUBLIC_FIREBASE_*) to <code>.env</code>, or run with the Firebase emulators. See the README.
-        </p>
-      </section>
-    );
-  }
-
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
     setError(null);
@@ -34,6 +23,24 @@ export function SignInCard({ title = "Sign in to start", subtitle }: { title?: s
       setBusy(false);
     }
   };
+
+  if (!configured) {
+    return (
+      <section className="card space-y-3">
+        <div>
+          <h2 className="text-xl font-black">{title}</h2>
+          <p className="mt-1 text-sm text-ink-soft">Jump straight in as a guest. No account needed.</p>
+        </div>
+        <button className="btn-primary" disabled={busy} onClick={() => run(signInGuest)}>
+          👤 Play as a guest
+        </button>
+        <p className="text-xs text-ink-faint">
+          Your challenges are saved to this browser&apos;s guest ID. Google and email accounts appear once Firebase is set up (see the README).
+        </p>
+        {error && <p className="rounded-2xl bg-coral-soft p-3 text-sm font-bold">{error}</p>}
+      </section>
+    );
+  }
 
   return (
     <section className="card space-y-3">

@@ -1,8 +1,9 @@
 import "server-only";
-import { adminDb, type AuthedUser } from "@/lib/firebase/admin";
+import type { AuthedUser } from "@/lib/firebase/admin";
 import type { DecisionAction, Market } from "@/lib/engine/types";
 import { getDailyBars } from "@/lib/market/provider";
 import { CHALLENGE, CHALLENGE_TICKERS } from "./config";
+import { challengeStore } from "./store";
 import { addDays, buildChallengeMarket, challengeWindow, detectEvents, parsePlan, scoreChallenge, VALID_ACTIONS } from "./logic";
 import type { ChallengeAction, ChallengeDoc, ChallengeMode, ChallengeView, LeaderboardEntry } from "./types";
 
@@ -12,8 +13,6 @@ export class UserError extends Error {
   }
 }
 
-const challenges = () => adminDb().collection("challenges");
-const leaderboard = (mode: ChallengeMode) => adminDb().collection(mode === "live" ? "leaderboard_live" : "leaderboard_replay");
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -63,14 +62,12 @@ export async function createChallenge(user: AuthedUser, body: unknown): Promise<
     createdAt: now,
     updatedAt: now,
   };
-  const ref = await challenges().add(doc);
-  return ref.id;
+  return challengeStore().create(doc);
 }
 
 async function loadOwned(user: AuthedUser, id: string): Promise<ChallengeDoc> {
   if (!/^[A-Za-z0-9]{1,40}$/.test(id)) throw new UserError("Challenge not found", 404);
-  const snap = await challenges().doc(id).get();
-  const doc = snap.data() as ChallengeDoc | undefined;
+  const doc = await challengeStore().get(id);
   if (!doc || doc.uid !== user.uid) throw new UserError("Challenge not found", 404);
   return doc;
 }
@@ -105,9 +102,8 @@ export async function addAction(user: AuthedUser, id: string, body: unknown): Pr
   const reasoning = typeof b.reasoning === "string" ? b.reasoning.trim().slice(0, 500) : "";
   if (reasoning.length < 3) throw new UserError("Write a few words about why");
 
-  await adminDb().runTransaction(async (tx) => {
-    const ref = challenges().doc(id);
-    const doc = (await tx.get(ref)).data() as ChallengeDoc | undefined;
+  if (!/^[A-Za-z0-9]{1,40}$/.test(id)) throw new UserError("Challenge not found", 404);
+  await challengeStore().update(id, async (doc) => {
     if (!doc || doc.uid !== user.uid) throw new UserError("Challenge not found", 404);
     if (doc.status !== "active") throw new UserError("This challenge is finished");
 
@@ -142,7 +138,7 @@ export async function addAction(user: AuthedUser, id: string, body: unknown): Pr
     }
 
     const entry: ChallengeAction = { date, action, reasoning, createdAt: new Date().toISOString(), ...(eventDate ? { eventDate } : {}) };
-    tx.update(ref, { actions: [...doc.actions, entry], updatedAt: entry.createdAt });
+    return { actions: [...doc.actions, entry], updatedAt: entry.createdAt };
   });
 }
 
@@ -159,8 +155,6 @@ export async function finishChallenge(user: AuthedUser, id: string): Promise<voi
       ? { ...doc.deposit, status: result.depositRefunded ? ("refunded_mock" as const) : ("donated_mock" as const) }
       : doc.deposit;
 
-  const batch = adminDb().batch();
-  batch.update(challenges().doc(id), { status: "finished", result, deposit, updatedAt: result.finishedAt });
   const entry: Omit<LeaderboardEntry, "id"> & { uid: string } = {
     uid: doc.uid,
     displayName: doc.displayName,
@@ -168,17 +162,15 @@ export async function finishChallenge(user: AuthedUser, id: string): Promise<voi
     habitsScore: result.habits.total,
     finishedAt: result.finishedAt,
   };
-  batch.set(leaderboard(doc.mode).doc(id), entry);
-  await batch.commit();
+  await challengeStore().finish(id, { status: "finished", result, deposit, updatedAt: result.finishedAt }, doc.mode, entry);
 }
 
 export async function listMyChallenges(user: AuthedUser) {
-  const snap = await challenges().where("uid", "==", user.uid).get();
-  return snap.docs
-    .map((d) => {
-      const c = d.data() as ChallengeDoc;
+  const rows = await challengeStore().listByUid(user.uid);
+  return rows
+    .map(({ id, doc: c }) => {
       return {
-        id: d.id,
+        id,
         mode: c.mode,
         status: c.status,
         startDate: c.startDate,
@@ -191,9 +183,5 @@ export async function listMyChallenges(user: AuthedUser) {
 }
 
 export async function getLeaderboard(mode: ChallengeMode): Promise<LeaderboardEntry[]> {
-  const snap = await leaderboard(mode).orderBy("challengeScore", "desc").limit(20).get();
-  return snap.docs.map((d) => {
-    const e = d.data() as LeaderboardEntry;
-    return { id: d.id, displayName: e.displayName, challengeScore: e.challengeScore, habitsScore: e.habitsScore, finishedAt: e.finishedAt };
-  });
+  return challengeStore().top(mode, 20);
 }

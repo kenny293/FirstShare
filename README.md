@@ -87,8 +87,9 @@ A 14-day challenge at `/challenge` on **real daily prices** with $1,000 of pract
 - **$10 commitment deposit: mock only.** No payment is taken. It's "refunded" for a score ≥70 with every check-in answered and every rule kept, and otherwise "donated" to financial-literacy education.
 
 ### How it's built
-- **Auth:** Firebase Auth in the browser (Google, email/password, guest). That's the only Firebase code the browser runs.
-- **Storage:** Firestore, accessed **only by the server** through the Admin SDK after verifying the user's ID token. [firestore.rules](firestore.rules) denies all browser access, so scores and leaderboard entries can't be tampered with. Collections: `challenges`, `leaderboard_live`, `leaderboard_replay`.
+- **Auth:** Firebase Auth in the browser (Google, email/password, guest). The server verifies sign-ins with just the project ID; no service account is needed for that.
+- **Guests always work.** With no Firebase config, or if Firebase's Anonymous sign-in is turned off, "Try as a guest" creates a **local guest**: a random private ID kept in the browser. Signing out keeps the ID, so playing as a guest again brings the same challenges back.
+- **Storage:** with a service account (or the emulators), challenges go to **Firestore**, accessed only by the server; [firestore.rules](firestore.rules) denies all browser access, so scores can't be tampered with. Collections: `challenges`, `leaderboard_live`, `leaderboard_replay`. Without a service account, they're saved to `.local-data/challenges.json` on the server (gitignored; memory-only on read-only hosting). Local guest IDs are rejected once Firestore is on.
 - **Prices:** [src/lib/market/provider.ts](src/lib/market/provider.ts) fetches daily bars from the **Alpaca Market Data API** (IEX feed on the free plan; keys stay on the server, cached for 5 minutes). Without Alpaca keys it falls back to the local `/data` files and says so on screen.
 - **Logic:** [src/lib/challenge/logic.ts](src/lib/challenge/logic.ts) (pure and unit-tested) reuses the level engine for simulation and the Habits Score.
 
